@@ -1,0 +1,77 @@
+# List of stages for jobs, and their order of execution
+stages:
+  - deploy
+# Rules for when the pipeline should run
+workflow:
+  rules:
+    # If the pipeline is triggered from the web interface, always run it
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+    # Otherwise, never run it
+    - when: never
+# Variables that can be used in the pipeline
+variables:
+  # Path to download secure files
+  SECURE_FILES_DOWNLOAD_PATH: '.'
+  # Custom variable with a value and description
+  VAR:
+    value: "hello"
+    description: "prueba1"
+    # Template for deploy jobs
+.deploy_template:
+  # Steps to execute before the main script of each job
+  before_script:
+    # Enable alias expansion in scripts
+    - shopt -s expand_aliases
+    # Define aliases for ssh and scp commands with custom options
+    - alias ssh='ssh -i id_rsa -o StrictHostKeyChecking=no'
+    - alias scp='scp -i id_rsa -o StrictHostKeyChecking=no'
+    # Download secure files
+    - download-secure-files
+    # Set correct permissions for SSH key file
+    - chmod 0600 id_rsa
+
+# Job to deploy to server svr01.devprov
+deploy_svr01:
+  # Stage of the job (must be one of the stages defined above)
+  stage: deploy
+  # Extend from .deploy_template to include common steps
+  extends: .deploy_template
+  # Main script of the job (steps to execute)
+  script:
+    # Stop Tomcat service on target server
+    - ssh root@svr01.devprov "systemctl stop tomcat"
+    # Create backup of current version of web application
+    - ssh root@svr01.devprov "cp /usr/share/tomcat/webapps/new_war.war ~/bkp"
+    # Remove all files from Tomcat webapps directory on target server
+    - ssh root@svr01.devprov "rm -rf /usr/share/tomcat/webapps/*"
+    # Copy new version of web application to Tomcat webapps directory on target server
+    - scp new_war.war root@svr01.devprov:/usr/share/tomcat/webapps/new_war.war
+    # Change ownership of Tomcat webapps directory on target server to tomcat user and group
+    - ssh root@svr01.devprov "chown -R tomcat:tomcat /usr/share/tomcat/webapps"
+    # Start Tomcat service on target server
+    - ssh root@svr01.devprov "systemctl start tomcat"
+
+# Job to deploy to server svr02.devprov (similar to deploy_svr01)
+deploy_svr02:
+  stage: deploy
+  extends: .deploy_template
+  script:
+    - ssh root@svr02.devprov "systemctl stop tomcat"
+    - ssh root@svr02.devprov "cp /usr/share/tomcat/webapps/new_war.war ~/bkp"
+    - ssh root@svr02.devprov "rm -rf /usr/share/tomcat/webapps/*"
+    - scp new_war.war root@svr02.devprov:/usr/share/tomcat/webapps/new_war.war
+    - ssh root@svr02.devprov "chown -R tomcat:tomcat /usr/share/tomcat/webapps"
+    - ssh root@svr02.devprov "systemctl start tomcat"
+
+# Job to deploy to server svr03.devprov (similar to deploy_svr01)
+deploy_svr03:
+  stage: deploy
+  extends: .deploy_template
+  script:
+    - ssh root@svr03.devprov "systemctl stop tomcat"
+    - ssh root@svr03.devprov "cp /usr/share/tomcat/webapps/new_war.war ~/bkp"
+    - ssh root@svr03.devprov "rm -rf /usr/share/tomcat/webapps/*"
+    - scp new_war.war root@svr03.devprov:/usr/share/tomcat/webapps/new_war.war
+    - ssh root@svr03.devprov "chown -R tomcat:tomcat /usr/share/tomcat/webapps"
+    - ssh root@svr03.devprov "systemctl start tomcat"
